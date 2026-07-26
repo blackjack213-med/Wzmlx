@@ -14,6 +14,7 @@ from ..helper.ext_utils.bot_utils import (
     sync_to_async,
 )
 from ..helper.ext_utils.exceptions import DirectDownloadLinkException
+from ..helper.ext_utils.files_utils import is_first_archive_split
 from ..helper.ext_utils.links_utils import (
     is_gdrive_id,
     is_gdrive_link,
@@ -23,6 +24,7 @@ from ..helper.ext_utils.links_utils import (
     is_telegram_link,
     is_url,
 )
+from ..helper.ext_utils.split_archive_utils import find_split_siblings
 from ..helper.ext_utils.task_manager import pre_task_check
 from ..helper.listeners.task_listener import TaskListener
 from ..helper.mirror_leech_utils.download_utils.aria2_download import (
@@ -306,6 +308,37 @@ class Mirror(TaskListener):
                 await self.remove_from_same_dir()
                 await delete_links(self.message)
                 return
+
+            # If this single message is part 1 of a split archive (.part1.rar,
+            # .7z.001, etc.) and the other parts exist nearby in the same chat,
+            # fetch them all as one grouped multi-task by feeding the same
+            # list-of-links path just below - the existing same_dir merge
+            # mechanism then extracts once every part has landed, with no
+            # further changes needed anywhere else.
+            if (
+                Config.AUTO_EXTRACT_ARCHIVES
+                and not is_bulk
+                and reply_to
+                and not isinstance(reply_to, list)
+                and getattr(reply_to, "document", None)
+                and reply_to.document.file_name
+                and is_first_archive_split(reply_to.document.file_name)
+            ):
+                try:
+                    siblings = await find_split_siblings(
+                        TgClient.user or self.client,
+                        reply_to.chat.id,
+                        reply_to.id,
+                        reply_to.document.file_name,
+                    )
+                except Exception as e:
+                    LOGGER.warning(f"Split archive sibling search failed: {e}")
+                    siblings = []
+                if siblings:
+                    base_link = self.link.rsplit("/", 1)[0]
+                    reply_to = [self.link] + [
+                        f"{base_link}/{mid}" for mid in siblings
+                    ]
 
         if isinstance(reply_to, list):
             self.bulk = reply_to
