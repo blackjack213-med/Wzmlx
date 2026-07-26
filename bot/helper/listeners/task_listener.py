@@ -36,6 +36,7 @@ from ..ext_utils.files_utils import (
     clean_target,
     create_recursive_symlink,
     get_path_size,
+    is_archive,
     join_files,
     remove_excluded_files,
     move_and_merge,
@@ -230,6 +231,16 @@ class TaskListener(TaskConfig):
 
         if self.join and not self.is_file:
             await join_files(up_path)
+
+        if (
+            Config.AUTO_EXTRACT_ARCHIVES
+            and not self.extract
+            and not self.compress
+            and not self.is_nzb
+            and self.is_file
+            and is_archive(self.name)
+        ):
+            self.extract = True
 
         if self.extract and not self.is_nzb:
             up_path = await self.proceed_extract(up_path, gid)

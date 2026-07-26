@@ -82,6 +82,7 @@ DEFAULT_VALUES = {
 
 BOOL_VARS = [
     "AS_DOCUMENT",
+    "AUTO_EXTRACT_ARCHIVES",
     "BOT_PM",
     "COLORED_BTNS",
     "DELETE_LINKS",
@@ -115,6 +116,7 @@ BOOL_VARS = [
 DEFAULT_DESP = {
     "AS_DOCUMENT": "Send files as document instead of media. Default: False.",
     "AUTHORIZED_CHATS": "User/Chat IDs authorized to use the bot. Space-separated. Supports thread IDs with | separator.",
+    "AUTO_EXTRACT_ARCHIVES": "Auto-extract zip/rar/other archives before upload, without needing -e. Default: True.",
     "BASE_URL": "Public URL for torrent web file selection. Format: http://ip or http://ip:port.",
     "BOT_TOKEN": "Telegram Bot Token from @BotFather.",
     "HELPER_TOKENS": "Additional bot tokens for parallel task handling.",

@@ -7,6 +7,7 @@ from wz_bin import bin_name
 class Config:
     AS_DOCUMENT = False
     AUTHORIZED_CHATS = ""
+    AUTO_EXTRACT_ARCHIVES = True
     BASE_URL = ""
     BOT_TOKEN = ""
     HELPER_TOKENS = ""
