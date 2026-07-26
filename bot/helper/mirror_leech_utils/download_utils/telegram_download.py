@@ -34,15 +34,20 @@ class TelegramDownloadHelper:
         self._id = ""
         self.session = ""
         tm = self._listener.transmission_mode
-        self._hyper_dl = (
-            Config.USE_HYPER
-            and Config.LEECH_DUMP_CHAT
-            and (
-                (tm in ("bot", "both") and len(TgClient.helper_bots) != 0)
-                or (
-                    tm in ("user", "both")
-                    and (len(TgClient.helper_users) != 0 or TgClient.user is not None)
-                )
+        # Note: Config.LEECH_DUMP_CHAT is NOT required here. It only controls
+        # an optional relay-through-the-bot step inside HypertgDownload
+        # (dump_chat truthy -> copy via TgClient.bot first) which is only
+        # needed when the bot itself lacks access to the source chat. When
+        # dump_chat is falsy, HypertgDownload already falls back to using
+        # the source chat directly (message.chat.id) and still gets the
+        # pipelined multi-request speed benefit from TgClient.user/helper
+        # clients - gating hyper mode on LEECH_DUMP_CHAT disabled that
+        # entirely for private chats the bot can't join.
+        self._hyper_dl = Config.USE_HYPER and (
+            (tm in ("bot", "both") and len(TgClient.helper_bots) != 0)
+            or (
+                tm in ("user", "both")
+                and (len(TgClient.helper_users) != 0 or TgClient.user is not None)
             )
         )
         self._hyper_dl_instance = None
