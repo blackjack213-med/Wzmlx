@@ -336,6 +336,15 @@ class Mirror(TaskListener):
                     LOGGER.warning(f"Split archive sibling search failed: {e}")
                     siblings = []
                 if siblings:
+                    # same_dir grouping keys off self.folder_name (set from
+                    # -m below). Without a real, shared, non-empty name here,
+                    # every spawned task's own membership write collides on
+                    # the same "" key and overwrites the one before it
+                    # instead of joining it, so nothing ever merges -
+                    # confirmed by testing: parts uploaded independently
+                    # with no "Waiting for other tasks..." / merge log lines.
+                    folder_tag = f"splitarc{reply_to.id}"
+                    input_list = input_list + ["-m", folder_tag]
                     base_link = self.link.rsplit("/", 1)[0]
                     reply_to = [self.link] + [
                         f"{base_link}/{mid}" for mid in siblings
