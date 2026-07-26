@@ -1,6 +1,6 @@
 from asyncio import sleep, gather
 from random import choice
-from re import match as re_match
+from re import match as re_match, search as re_search
 from time import time
 
 from pyrogram.types import Message, InputMediaPhoto, ReplyParameters
@@ -391,8 +391,19 @@ async def get_tg_link_message(link, personal_client=None):
         raise TgLinkException("Private: Please report!")
 
 
+_status_flood_until = {}
+
+
+def _flood_wait_seconds(error_text):
+    if m := re_search(r"[Aa] wait of (\d+) seconds", error_text):
+        return int(m.group(1))
+    return None
+
+
 async def update_status_message(sid, force=False):
     if intervals["stopAll"]:
+        return
+    if (until := _status_flood_until.get(sid)) and time() < until:
         return
     async with task_dict_lock:
         if not status_dict.get(sid):
@@ -426,6 +437,12 @@ async def update_status_message(sid, force=False):
                     if obj := intervals["status"].get(sid):
                         obj.cancel()
                         del intervals["status"][sid]
+                elif (secs := _flood_wait_seconds(message)) is not None:
+                    _status_flood_until[sid] = time() + secs
+                    LOGGER.warning(
+                        f"Status with id: {sid} flood-waited for {secs}s, "
+                        "pausing status updates until it clears"
+                    )
                 else:
                     LOGGER.error(
                         f"Status with id: {sid} haven't been updated. Error: {message}"
@@ -439,6 +456,8 @@ async def send_status_message(msg, user_id=0):
     if intervals["stopAll"]:
         return
     sid = user_id or msg.chat.id
+    if (until := _status_flood_until.get(sid)) and time() < until:
+        return
     is_user = bool(user_id)
     async with task_dict_lock:
         if sid in status_dict:
@@ -459,9 +478,16 @@ async def send_status_message(msg, user_id=0):
                 msg, text, buttons, block=False, photo="IMAGES"
             )
             if isinstance(message, str):
-                LOGGER.error(
-                    f"Status with id: {sid} haven't been sent. Error: {message}"
-                )
+                if (secs := _flood_wait_seconds(message)) is not None:
+                    _status_flood_until[sid] = time() + secs
+                    LOGGER.warning(
+                        f"Status with id: {sid} flood-waited for {secs}s, "
+                        "pausing status updates until it clears"
+                    )
+                else:
+                    LOGGER.error(
+                        f"Status with id: {sid} haven't been sent. Error: {message}"
+                    )
                 return
             await delete_message(old_message)
             message.text = text
@@ -474,6 +500,13 @@ async def send_status_message(msg, user_id=0):
                 msg, text, buttons, block=False, photo="IMAGES"
             )
             if isinstance(message, str):
+                if (secs := _flood_wait_seconds(message)) is not None:
+                    _status_flood_until[sid] = time() + secs
+                    LOGGER.warning(
+                        f"Status with id: {sid} flood-waited for {secs}s, "
+                        "pausing status updates until it clears"
+                    )
+                    return
                 LOGGER.error(
                     f"Status with id: {sid} haven't been sent. Error: {message}"
                 )
