@@ -3,7 +3,7 @@ from html import escape
 from time import time
 from mimetypes import guess_type
 from contextlib import suppress
-from os import path as ospath
+from os import path as ospath, walk
 from pyrogram.enums import ButtonStyle
 
 from aiofiles.os import listdir, remove, path as aiopath
@@ -38,6 +38,7 @@ from ..ext_utils.files_utils import (
     get_path_size,
     is_archive,
     is_archive_split,
+    is_first_archive_split,
     join_files,
     remove_excluded_files,
     move_and_merge,
@@ -238,11 +239,22 @@ class TaskListener(TaskConfig):
             and not self.extract
             and not self.compress
             and not self.is_nzb
-            and self.is_file
-            and is_archive(self.name)
-            and not is_archive_split(self.name)
         ):
-            self.extract = True
+            if (
+                self.is_file
+                and is_archive(self.name)
+                and not is_archive_split(self.name)
+            ):
+                self.extract = True
+            elif not self.is_file:
+                for _, _, files in await sync_to_async(walk, dl_path):
+                    if any(
+                        is_first_archive_split(f)
+                        or (is_archive(f) and not f.strip().lower().endswith(".rar"))
+                        for f in files
+                    ):
+                        self.extract = True
+                        break
 
         if self.extract and not self.is_nzb:
             up_path = await self.proceed_extract(up_path, gid)
