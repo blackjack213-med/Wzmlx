@@ -26,4 +26,4 @@ graphify-out/*
 .agent*
 AGENTS.md
 __pycache__/
-sabnzbd/
+/sabnzbd/
