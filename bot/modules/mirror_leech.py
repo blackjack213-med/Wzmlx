@@ -318,6 +318,7 @@ class Mirror(TaskListener):
             if (
                 Config.AUTO_EXTRACT_ARCHIVES
                 and not is_bulk
+                and self.multi <= 1
                 and reply_to
                 and not isinstance(reply_to, list)
                 and getattr(reply_to, "document", None)
@@ -343,7 +344,16 @@ class Mirror(TaskListener):
         if isinstance(reply_to, list):
             self.bulk = reply_to
             b_msg = input_list[:1]
-            self.options = " ".join(input_list[1:])
+            # Pre-existing bug: input_list[1:] includes the original link
+            # token itself whenever the command had no other flags (e.g. a
+            # bare "/leech <link>"), so it was getting duplicated into the
+            # reconstructed "<bulk[0]> -i <n> <options>" text below, which
+            # then re-triggers this same bulk path on the recursive
+            # new_event() call and duplicates further each time. Only the
+            # actual flags belong in options, not the link that produced them.
+            self.options = " ".join(
+                tok for tok in input_list[1:] if tok != self.link
+            )
             b_msg.append(f"{self.bulk[0]} -i {len(self.bulk)} {self.options}")
             nextmsg = await send_message(self.message, " ".join(b_msg))
             nextmsg = await self.client.get_messages(
