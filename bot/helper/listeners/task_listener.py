@@ -37,6 +37,7 @@ from ..ext_utils.files_utils import (
     create_recursive_symlink,
     get_path_size,
     is_archive,
+    is_archive_split,
     join_files,
     remove_excluded_files,
     move_and_merge,
@@ -239,6 +240,7 @@ class TaskListener(TaskConfig):
             and not self.is_nzb
             and self.is_file
             and is_archive(self.name)
+            and not is_archive_split(self.name)
         ):
             self.extract = True
 
