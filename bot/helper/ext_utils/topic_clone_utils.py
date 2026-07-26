@@ -10,9 +10,13 @@ from ...core.tg_client import TgClient
 from ..telegram_helper.bot_commands import BotCommands
 
 _GENERAL_TOPIC_ID = 1
-_CREATE_PAUSE = 2
-_SUBMIT_PAUSE = 1.5
-_PAGE_PAUSE = 1
+# Tuned for speed while staying under Telegram's per-chat rate limit
+# (roughly 1 message/sec to the same chat before it starts flood-waiting).
+# Group/topic creation keeps a bit more headroom since those are rarer,
+# heavier actions than a routine message send.
+_CREATE_PAUSE = 1.2
+_SUBMIT_PAUSE = 0.7
+_PAGE_PAUSE = 0.4
 
 
 async def _retry_flood(func, *args, **kwargs):
