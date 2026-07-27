@@ -28,7 +28,6 @@ from ..ext_utils.media_utils import (
 class HypertgUpload(HypertgTransfer):
     def __init__(self, obj):
         super().__init__(obj)
-        self._up_file = ""
         self._file_progress = {}
 
     async def _progress(self, current, total, file_path):
@@ -48,14 +47,14 @@ class HypertgUpload(HypertgTransfer):
         user_session=False,
     ):
         self._cancel.clear()
-        self._up_file = ospath.basename(file_path)
+        up_file = ospath.basename(file_path)
 
         is_video, is_audio, is_image = await get_document_type(file_path)
 
         thumb = user_thumb if user_thumb and user_thumb != "none" else None
 
         if not is_image and thumb is None:
-            file_name = ospath.splitext(self._up_file)[0]
+            file_name = ospath.splitext(up_file)[0]
             base_path = getattr(self._obj, "_path", "")
             thumb_path = f"{base_path}/yt-dlp-thumb/{file_name}.jpg"
             if await aiopath.isfile(thumb_path):
@@ -139,6 +138,7 @@ class HypertgUpload(HypertgTransfer):
                     artist=artist,
                     title=title,
                     user_only=hyper_user_only,
+                    up_file=up_file,
                 )
             else:
                 direct_rply = (
@@ -159,16 +159,17 @@ class HypertgUpload(HypertgTransfer):
                     artist=artist,
                     title=title,
                     user_session=user_session,
+                    up_file=up_file,
                 )
 
-            LOGGER.info(f"HypertgUL uploaded {self._up_file}")
+            LOGGER.info(f"HypertgUL uploaded {up_file}")
             return sent
 
         except StopTransmission:
-            LOGGER.warning(f"HypertgUL cancelled {self._up_file}")
+            LOGGER.warning(f"HypertgUL cancelled {up_file}")
             raise
         except Exception as e:
-            LOGGER.error(f"HypertgUL fail {self._up_file}: {type(e).__name__}: {e}")
+            LOGGER.error(f"HypertgUL fail {up_file}: {type(e).__name__}: {e}")
             raise
         finally:
             if user_thumb is None and thumb is not None and await aiopath.exists(thumb):
@@ -177,35 +178,51 @@ class HypertgUpload(HypertgTransfer):
                 except Exception:
                     pass
 
-    async def _send_with_retry(self, send_func, **kwargs):
+    async def _send_with_retry(self, send_func, up_file="", **kwargs):
         while True:
             try:
                 return await send_func(**kwargs)
             except (FloodWait, FloodPremiumWait) as f:
-                LOGGER.warning(f"HypertgUL flood {f.value}s on {self._up_file}")
+                LOGGER.warning(f"HypertgUL flood {f.value}s on {up_file}")
                 await sleep(f.value + 1)
 
-    async def _try_send(self, key, client, kwargs):
+    async def _try_send(self, key, client, kwargs, up_file=""):
         try:
             if key == "videos":
-                return await self._send_with_retry(client.send_video, **kwargs)
+                return await self._send_with_retry(
+                    client.send_video, up_file=up_file, **kwargs
+                )
             elif key == "audios":
-                return await self._send_with_retry(client.send_audio, **kwargs)
+                return await self._send_with_retry(
+                    client.send_audio, up_file=up_file, **kwargs
+                )
             elif key == "photos":
-                return await self._send_with_retry(client.send_photo, **kwargs)
+                return await self._send_with_retry(
+                    client.send_photo, up_file=up_file, **kwargs
+                )
             else:
-                return await self._send_with_retry(client.send_document, **kwargs)
+                return await self._send_with_retry(
+                    client.send_document, up_file=up_file, **kwargs
+                )
         except PhotoInvalidDimensions:
             kwargs.pop("thumb", None)
             kwargs.pop("video_cover", None)
             if key == "videos":
-                return await self._send_with_retry(client.send_video, **kwargs)
+                return await self._send_with_retry(
+                    client.send_video, up_file=up_file, **kwargs
+                )
             elif key == "audios":
-                return await self._send_with_retry(client.send_audio, **kwargs)
+                return await self._send_with_retry(
+                    client.send_audio, up_file=up_file, **kwargs
+                )
             elif key == "photos":
-                return await self._send_with_retry(client.send_photo, **kwargs)
+                return await self._send_with_retry(
+                    client.send_photo, up_file=up_file, **kwargs
+                )
             else:
-                return await self._send_with_retry(client.send_document, **kwargs)
+                return await self._send_with_retry(
+                    client.send_document, up_file=up_file, **kwargs
+                )
 
     async def _hyper_send(
         self,
@@ -221,6 +238,7 @@ class HypertgUpload(HypertgTransfer):
         artist="",
         title="",
         user_only=False,
+        up_file="",
     ):
         if user_only:
             candidates = {k: self.work_loads[k] for k in self.clients if k < 0}
@@ -274,7 +292,7 @@ class HypertgUpload(HypertgTransfer):
             else:
                 kwargs["document"] = file_path
 
-            sent = await self._try_send(key, client, kwargs)
+            sent = await self._try_send(key, client, kwargs, up_file=up_file)
             return sent
         finally:
             self.work_loads[idx] -= 1
@@ -293,6 +311,7 @@ class HypertgUpload(HypertgTransfer):
         artist="",
         title="",
         user_session=False,
+        up_file="",
     ):
         client = (
             TgClient.user if user_session and TgClient.user else self._listener.client
@@ -340,7 +359,7 @@ class HypertgUpload(HypertgTransfer):
         else:
             kwargs["document"] = file_path
 
-        return await self._try_send(key, client, kwargs)
+        return await self._try_send(key, client, kwargs, up_file=up_file)
 
     async def cancel(self):
         await super().cancel()
