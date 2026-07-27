@@ -84,6 +84,8 @@ class HypertgDownload(HypertgTransfer):
         self._ref_cache = {}
         self._cdn_info = {}
         self._cdn_sessions = {}
+        self._ref_dead = False
+        self._ref_dead_error = ""
 
     def _ref_get(self, idx):
         return self._ref_cache.get(idx)
@@ -98,6 +100,10 @@ class HypertgDownload(HypertgTransfer):
             cached = self._ref_get(idx)
             if cached is not None:
                 return cached
+        if self._ref_dead:
+            # Already exhausted every client for this message once — don't
+            # hammer the API again on every single chunk retry.
+            raise ValueError(self._ref_dead_error)
         fid = await self._fetch_ref_try(client)
         if fid:
             self._ref_put(idx, fid)
@@ -114,9 +120,11 @@ class HypertgDownload(HypertgTransfer):
             if fid:
                 self._ref_put(idx, fid)
                 return fid
-        raise ValueError(
+        self._ref_dead_error = (
             f"no file_id in msg {self.message.id} in dump_chat={self.dump_chat} (all clients failed)"
         )
+        self._ref_dead = True
+        raise ValueError(self._ref_dead_error)
 
     async def _fetch_ref_try(self, client):
         try:
