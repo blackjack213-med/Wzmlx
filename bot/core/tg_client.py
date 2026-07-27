@@ -216,6 +216,23 @@ class TgClient:
         LOGGER.info(f"WZ Bot : [@{cls.BNAME}] Started!")
 
     @classmethod
+    async def _prime_user_dialogs(cls):
+        """Warm the in-memory user session's peer cache by iterating its
+        dialogs once. Without this, a fresh (in_memory) session has no
+        cached access_hash for channels it's a member of, so raw calls
+        like HyperDL's get_messages(chat_id, ...) fail with CHANNEL_INVALID
+        until the peer is resolved some other way."""
+        if cls.user is None:
+            return
+        try:
+            count = 0
+            async for _ in cls.user.get_dialogs():
+                count += 1
+            LOGGER.info(f"Primed user session peer cache ({count} dialogs)")
+        except Exception as e:
+            LOGGER.warning(f"Failed to prime user session dialogs: {e}")
+
+    @classmethod
     async def _retry_user(cls, delay):
         await sleep(delay)
         try:
@@ -231,6 +248,7 @@ class TgClient:
                 cls.MAX_SPLIT_SIZE = 4194304000
             uname = cls.user.me.username or cls.user.me.first_name
             LOGGER.info(f"WZ User : [{uname}] Started!")
+            bot_loop.create_task(cls._prime_user_dialogs())
         except FloodWait as e:
             LOGGER.warning(f"User client FloodWait: Retrying in {e.value}s...")
             bot_loop.create_task(cls._retry_user(e.value))
@@ -257,6 +275,7 @@ class TgClient:
                     cls.MAX_SPLIT_SIZE = 4194304000
                 uname = cls.user.me.username or cls.user.me.first_name
                 LOGGER.info(f"WZ User : [{uname}] Started!")
+                bot_loop.create_task(cls._prime_user_dialogs())
             except FloodWait as e:
                 LOGGER.warning(
                     f"User client FloodWait: Retrying in {e.value}s (non-blocking)..."
