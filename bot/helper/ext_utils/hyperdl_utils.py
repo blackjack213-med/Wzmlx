@@ -678,7 +678,10 @@ class HypertgDownload(HypertgTransfer):
                 fid_map[ci] = await self._fetch_ref(ci, self.clients[ci])
         except Exception as e:
             LOGGER.error(f"HypertgDL ref fail: {e}")
-            return None
+            # Re-raise (rather than return None) so the caller's plain-
+            # download fallback (message.download() / TgClient.user) gets a
+            # chance to run instead of silently failing the whole task.
+            raise
 
         first_fid = fid_map[assigns[0]]
         try:
