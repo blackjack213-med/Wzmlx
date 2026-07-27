@@ -33,7 +33,6 @@ class TelegramDownloadHelper:
         self._listener = listener
         self._id = ""
         self.session = ""
-        tm = self._listener.transmission_mode
         # Note: Config.LEECH_DUMP_CHAT is NOT required here. It only controls
         # an optional relay-through-the-bot step inside HypertgDownload
         # (dump_chat truthy -> copy via TgClient.bot first) which is only
@@ -43,13 +42,16 @@ class TelegramDownloadHelper:
         # pipelined multi-request speed benefit from TgClient.user/helper
         # clients - gating hyper mode on LEECH_DUMP_CHAT disabled that
         # entirely for private chats the bot can't join.
-        self._hyper_dl = Config.USE_HYPER and (
-            (tm in ("bot", "both") and len(TgClient.helper_bots) != 0)
-            or (
-                tm in ("user", "both")
-                and (len(TgClient.helper_users) != 0 or TgClient.user is not None)
-            )
-        )
+        # HyperDL's ref-fetch (_fetch_ref/_fetch_ref_try) has an unresolved
+        # bug: when the source is a private channel that only TgClient.user
+        # can actually see, every single chunk retry re-exhausts the whole
+        # client pool instead of failing once and giving up, hammering the
+        # Telegram API thousands of times per failed download. Force-disabled
+        # for downloads until that's fixed properly; uploads are unaffected
+        # (hyperul_utils.py's hyper path just sends an already-local file to
+        # an already-reachable destination chat, no reference lookup at all)
+        # so they still get the multi-client speed benefit via Config.USE_HYPER.
+        self._hyper_dl = False
         self._hyper_dl_instance = None
 
     def _personal_client(self):
