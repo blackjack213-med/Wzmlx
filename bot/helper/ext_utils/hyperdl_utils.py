@@ -103,16 +103,17 @@ class HypertgDownload(HypertgTransfer):
             self._ref_put(idx, fid)
             return fid
         LOGGER.warning(
-            "HypertgDL ref ci=%d: client can't access dump_chat=%s, trying bots",
+            "HypertgDL ref ci=%d: client can't access dump_chat=%s, trying other clients",
             idx,
             self.dump_chat,
         )
         for cix, cl in self.clients.items():
-            if cix > 0:  # bot clients only
-                fid = await self._fetch_ref_try(cl)
-                if fid:
-                    self._ref_put(idx, fid)
-                    return fid
+            if cix == idx:
+                continue
+            fid = await self._fetch_ref_try(cl)
+            if fid:
+                self._ref_put(idx, fid)
+                return fid
         raise ValueError(
             f"no file_id in msg {self.message.id} in dump_chat={self.dump_chat} (all clients failed)"
         )
